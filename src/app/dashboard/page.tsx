@@ -145,7 +145,7 @@ export default function DashboardPage() {
       const interviewData = {
         candidate_id: userProfile.id,
         job_role: bookingForm.job_role,
-        time: bookingForm.time || new Date().toISOString()
+        time: bookingForm.time ? new Date(bookingForm.time).toISOString() : new Date().toISOString()
       };
 
       const response = await fetch(`${API_BASE_URL}/interview/`, {
