@@ -39,7 +39,7 @@ export default function DashboardPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [interviewDetails, setInterviewDetails] = useState<{[key: string]: Interview}>({});
+  const [expertInterviews, setExpertInterviews] = useState<Interview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showBookForm, setShowBookForm] = useState(false);
   const [bookingForm, setBookingForm] = useState<BookInterviewForm>({
@@ -102,13 +102,8 @@ export default function DashboardPage() {
         const interviewPromises = interviewIds.map((id) => fetchInterviewDetails(id));
         const interviewResults = await Promise.all(interviewPromises);
         
-        const interviewMap: {[key: string]: Interview} = {};
-        interviewResults.forEach(interview => {
-          if (interview) {
-            interviewMap[interview.id] = interview;
-          }
-        });
-        setInterviewDetails(interviewMap);
+        const validInterviews = interviewResults.filter(interview => interview !== null) as Interview[];
+        setExpertInterviews(validInterviews);
       } else {
         console.error('Failed to fetch assignments');
       }
@@ -119,15 +114,24 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchInterviewDetails = async (interviewId: string) => {
+  const fetchInterviewDetails = async (interviewId: string): Promise<Interview | null> => {
     try {
-      // Note: We might need an endpoint to get interview by ID
-      // For now, we'll return null and handle this case
-    router.push('/interview/' + interviewId);
+      const response = await fetch(`${API_BASE_URL}/interview/${interviewId}`);
+      if (response.ok) {
+        const interview = await response.json();
+        return interview;
+      } else {
+        console.error(`Failed to fetch interview ${interviewId}`);
+        return null;
+      }
     } catch (error) {
       console.error('Error fetching interview details:', error);
       return null;
     }
+  };
+
+  const handleInterviewClick = (interviewId: string) => {
+    router.push('/interview/' + interviewId);
   };
 
   const handleBookInterview = async (e: React.FormEvent) => {
@@ -195,14 +199,8 @@ export default function DashboardPage() {
   const upcomingInterviews = interviews.filter(interview => isUpcoming(interview.time));
   const completedInterviews = interviews.filter(interview => !isUpcoming(interview.time));
 
-  const upcomingAssignments = assignments.filter(assignment => {
-    const interview = interviewDetails[assignment.session];
-    return interview && isUpcoming(interview.time);
-  });
-  const completedAssignments = assignments.filter(assignment => {
-    const interview = interviewDetails[assignment.session];
-    return interview && !isUpcoming(interview.time);
-  });
+  const upcomingExpertInterviews = expertInterviews.filter(interview => isUpcoming(interview.time));
+  const completedExpertInterviews = expertInterviews.filter(interview => !isUpcoming(interview.time));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -305,16 +303,16 @@ export default function DashboardPage() {
             {/* Upcoming Interviews */}
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                Upcoming {userProfile.role === 'candidate' ? 'Interviews' : 'Assignments'}
+                Upcoming Interviews
               </h2>
               <div className="grid gap-4">
                 {userProfile.role === 'candidate' ? (
                   upcomingInterviews.length > 0 ? (
                     upcomingInterviews.map(interview => (
-                      <Link 
-                        key={interview.id} 
-                        href={`/interview/${interview.id}`}
-                        className="block bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-l-4 border-green-500"
+                      <div 
+                        key={interview.id}
+                        onClick={() => handleInterviewClick(interview.id)}
+                        className="block bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-l-4 border-green-500 cursor-pointer"
                       >
                         <div className="flex justify-between items-start">
                           <div>
@@ -329,7 +327,7 @@ export default function DashboardPage() {
                             Upcoming
                           </span>
                         </div>
-                      </Link>
+                      </div>
                     ))
                   ) : (
                     <div className="bg-white p-8 rounded-lg shadow text-center text-gray-500">
@@ -337,39 +335,31 @@ export default function DashboardPage() {
                     </div>
                   )
                 ) : (
-                  upcomingAssignments.length > 0 ? (
-                    upcomingAssignments.map(assignment => {
-                      const interview = interviewDetails[assignment.session];
-                      return (
-                        <Link 
-                          key={assignment.id}
-                          href={`/interview/${assignment.session}`}
-                          className="block bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-l-4 border-green-500"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900">
-                                Interview Assignment
-                              </h3>
-                              <p className="text-gray-600 mt-1">
-                                Priority: {assignment.priority} | Session: {assignment.session}
-                              </p>
-                              {interview && (
-                                <p className="text-gray-600">
-                                  Role: {interview.job_role} | Time: {formatDateTime(interview.time)}
-                                </p>
-                              )}
-                            </div>
-                            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                              Upcoming
-                            </span>
+                  upcomingExpertInterviews.length > 0 ? (
+                    upcomingExpertInterviews.map(interview => (
+                      <div 
+                        key={interview.id}
+                        onClick={() => handleInterviewClick(interview.id)}
+                        className="block bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-l-4 border-green-500 cursor-pointer"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {interview.job_role}
+                            </h3>
+                            <p className="text-gray-600 mt-1">
+                              Scheduled: {formatDateTime(interview.time)}
+                            </p>
                           </div>
-                        </Link>
-                      );
-                    })
+                          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                            Upcoming
+                          </span>
+                        </div>
+                      </div>
+                    ))
                   ) : (
                     <div className="bg-white p-8 rounded-lg shadow text-center text-gray-500">
-                      No upcoming assignments. You'll be notified when candidates book interviews in your expertise area.
+                      No upcoming interviews. You'll be notified when candidates book interviews in your expertise area.
                     </div>
                   )
                 )}
@@ -379,16 +369,16 @@ export default function DashboardPage() {
             {/* Completed Interviews */}
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                Completed {userProfile.role === 'candidate' ? 'Interviews' : 'Assignments'}
+                Completed Interviews
               </h2>
               <div className="grid gap-4">
                 {userProfile.role === 'candidate' ? (
                   completedInterviews.length > 0 ? (
                     completedInterviews.map(interview => (
-                      <Link 
+                      <div 
                         key={interview.id}
-                        href={`/interview/${interview.id}`}
-                        className="block bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-l-4 border-gray-400"
+                        onClick={() => handleInterviewClick(interview.id)}
+                        className="block bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-l-4 border-gray-400 cursor-pointer"
                       >
                         <div className="flex justify-between items-start">
                           <div>
@@ -408,7 +398,7 @@ export default function DashboardPage() {
                             Completed
                           </span>
                         </div>
-                      </Link>
+                      </div>
                     ))
                   ) : (
                     <div className="bg-white p-8 rounded-lg shadow text-center text-gray-500">
@@ -416,39 +406,36 @@ export default function DashboardPage() {
                     </div>
                   )
                 ) : (
-                  completedAssignments.length > 0 ? (
-                    completedAssignments.map(assignment => {
-                      const interview = interviewDetails[assignment.session];
-                      return (
-                        <Link 
-                          key={assignment.id}
-                          href={`/interview/${assignment.session}`}
-                          className="block bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-l-4 border-gray-400"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="text-lg font-semibold text-gray-900">
-                                Interview Assignment
-                              </h3>
-                              <p className="text-gray-600 mt-1">
-                                Priority: {assignment.priority} | Session: {assignment.session}
+                  completedExpertInterviews.length > 0 ? (
+                    completedExpertInterviews.map(interview => (
+                      <div 
+                        key={interview.id}
+                        onClick={() => handleInterviewClick(interview.id)}
+                        className="block bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-l-4 border-gray-400 cursor-pointer"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {interview.job_role}
+                            </h3>
+                            <p className="text-gray-600 mt-1">
+                              Completed: {formatDateTime(interview.time)}
+                            </p>
+                            {interview.score && (
+                              <p className="text-blue-600 font-medium">
+                                Score: {interview.score}/100
                               </p>
-                              {interview && (
-                                <p className="text-gray-600">
-                                  Role: {interview.job_role} | Completed: {formatDateTime(interview.time)}
-                                </p>
-                              )}
-                            </div>
-                            <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
-                              Completed
-                            </span>
+                            )}
                           </div>
-                        </Link>
-                      );
-                    })
+                          <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
+                            Completed
+                          </span>
+                        </div>
+                      </div>
+                    ))
                   ) : (
                     <div className="bg-white p-8 rounded-lg shadow text-center text-gray-500">
-                      No completed assignments yet.
+                      No completed interviews yet.
                     </div>
                   )
                 )}

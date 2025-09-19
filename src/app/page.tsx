@@ -11,7 +11,10 @@ export default function RegistrationPage() {
   const [selectedRole, setSelectedRole] = useState<'candidate' | 'expert'>('candidate');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
+ const profile = localStorage.getItem('userProfile');
+    if (profile) {
+        router.push('/dashboard');
+    }
   // Candidate form state
   const [candidateForm, setCandidateForm] = useState({
     name: '',
